@@ -3,21 +3,20 @@ pragma solidity ^0.8.26;
 
 import {Initializable} from '@solady/utils/Initializable.sol';
 
-import {BlankAction} from '@flaunch/treasury/actions/Blank.sol';
 import {Flaunch} from '@flaunch/Flaunch.sol';
-import {PublicTreasuryEscrow} from '@flaunch/treasury/PublicTreasuryEscrow.sol';
+
 import {PositionManager} from '@flaunch/PositionManager.sol';
+import {PublicTreasuryEscrow} from '@flaunch/treasury/PublicTreasuryEscrow.sol';
+import {BlankAction} from '@flaunch/treasury/actions/Blank.sol';
 
 import {FlaunchTest} from '../FlaunchTest.sol';
 
-
 contract PublicTreasuryEscrowTest is FlaunchTest {
-
     PublicTreasuryEscrow escrow;
 
     address owner = address(0x123);
     address nonOwner = address(0x456);
-    uint256 tokenId = 1;
+    uint tokenId = 1;
 
     function setUp() public {
         _deployPlatform();
@@ -28,7 +27,11 @@ contract PublicTreasuryEscrowTest is FlaunchTest {
         // Flaunch a new coin and approve the escrow to use it. We know that this will be the
         // first token flaunched, so we can just use the tokenId '1'.
         vm.startPrank(owner);
-        positionManager.flaunch(PositionManager.FlaunchParams('Test', 'TEST', '', supplyShare(50), 0, owner, 10_00, 0, abi.encode(''), abi.encode(1_000)));
+        positionManager.flaunch(
+            PositionManager.FlaunchParams(
+                'Test', 'TEST', '', supplyShare(50), 0, owner, 10_00, 0, abi.encode(''), abi.encode(1_000)
+            )
+        );
         flaunch.approve(address(escrow), 1);
         vm.stopPrank();
     }
@@ -126,5 +129,4 @@ contract PublicTreasuryEscrowTest is FlaunchTest {
         vm.prank(nonOwner);
         escrow.executeAction(action, data);
     }
-
 }

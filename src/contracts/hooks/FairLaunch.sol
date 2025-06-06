@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {BeforeSwapDelta, toBeforeSwapDelta} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
-import {BalanceDelta, toBalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
-import {FullMath} from '@uniswap/v4-core/src/libraries/FullMath.sol';
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
-import {LiquidityAmounts} from '@uniswap/v4-core/test/utils/LiquidityAmounts.sol';
-import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
+import {FullMath} from '@uniswap/v4-core/src/libraries/FullMath.sol';
+
 import {SafeCast} from '@uniswap/v4-core/src/libraries/SafeCast.sol';
 import {TickMath} from '@uniswap/v4-core/src/libraries/TickMath.sol';
+import {BalanceDelta, toBalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
+import {BeforeSwapDelta, toBeforeSwapDelta} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
+import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
+import {LiquidityAmounts} from '@uniswap/v4-core/test/utils/LiquidityAmounts.sol';
 
 import {CurrencySettler} from '@flaunch/libraries/CurrencySettler.sol';
 import {TickFinder} from '@flaunch/types/TickFinder.sol';
-
 
 /**
  * Adds functionality to the {PositionManager} that promotes a fair token launch.
@@ -30,7 +30,6 @@ import {TickFinder} from '@flaunch/types/TickFinder.sol';
  * @dev Based on: https://github.com/fico23/fundraise-hook
  */
 contract FairLaunch {
-
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
     using SafeCast for *;
@@ -69,7 +68,7 @@ contract FairLaunch {
     uint public constant FAIR_LAUNCH_WINDOW = 30 minutes;
 
     /// Maps a PoolId to a FairLaunchInfo struct
-    mapping (PoolId _poolId => FairLaunchInfo _info) internal _fairLaunchInfo;
+    mapping(PoolId _poolId => FairLaunchInfo _info) internal _fairLaunchInfo;
 
     /// Our Uniswap V4 {PoolManager} contract address
     IPoolManager public immutable poolManager;
@@ -82,7 +81,9 @@ contract FairLaunch {
      *
      * @param _poolManager The Uniswap V4 {PoolManager} contract
      */
-    constructor (IPoolManager _poolManager) {
+    constructor(
+        IPoolManager _poolManager
+    ) {
         poolManager = _poolManager;
 
         // Set our {PositionManager} as the caller
@@ -96,7 +97,9 @@ contract FairLaunch {
      *
      * @return If the {PoolKey} is within the fair launch window
      */
-    function inFairLaunchWindow(PoolId _poolId) public view returns (bool) {
+    function inFairLaunchWindow(
+        PoolId _poolId
+    ) public view returns (bool) {
         FairLaunchInfo memory info = _fairLaunchInfo[_poolId];
         return block.timestamp >= info.startsAt && block.timestamp < info.endsAt;
     }
@@ -108,7 +111,9 @@ contract FairLaunch {
      *
      * @return The FairLaunchInfo for the pool
      */
-    function fairLaunchInfo(PoolId _poolId) public view returns (FairLaunchInfo memory) {
+    function fairLaunchInfo(
+        PoolId _poolId
+    ) public view returns (FairLaunchInfo memory) {
         return _fairLaunchInfo[_poolId];
     }
 
@@ -123,9 +128,7 @@ contract FairLaunch {
         int24 _initialTick,
         uint _flaunchesAt,
         uint _initialTokenFairLaunch
-    ) public virtual onlyPositionManager returns (
-        FairLaunchInfo memory
-    ) {
+    ) public virtual onlyPositionManager returns (FairLaunchInfo memory) {
         // Determine the time that the fair launch window will close
         uint endsAt = _flaunchesAt + FAIR_LAUNCH_WINDOW;
 
@@ -157,9 +160,7 @@ contract FairLaunch {
         PoolKey memory _poolKey,
         uint _tokenFees,
         bool _nativeIsZero
-    ) public onlyPositionManager returns (
-        FairLaunchInfo memory
-    ) {
+    ) public onlyPositionManager returns (FairLaunchInfo memory) {
         // Reference the pool's FairLaunchInfo, ready to store updated values
         FairLaunchInfo storage info = _fairLaunchInfo[_poolKey.toId()];
 
@@ -175,7 +176,13 @@ contract FairLaunch {
             // memecoin position
             tickLower = TickFinder.MIN_TICK;
             tickUpper = (info.initialTick - 1).validTick(true);
-            _createImmutablePosition(_poolKey, tickLower, tickUpper, _poolKey.currency1.balanceOf(address(positionManager)) - _tokenFees, false);
+            _createImmutablePosition(
+                _poolKey,
+                tickLower,
+                tickUpper,
+                _poolKey.currency1.balanceOf(address(positionManager)) - _tokenFees,
+                false
+            );
         } else {
             // ETH position
             tickUpper = (info.initialTick - 1).validTick(true);
@@ -185,7 +192,13 @@ contract FairLaunch {
             // memecoin position
             tickLower = (info.initialTick + 1).validTick(false);
             tickUpper = TickFinder.MAX_TICK;
-            _createImmutablePosition(_poolKey, tickLower, tickUpper, _poolKey.currency0.balanceOf(address(positionManager)) - _tokenFees, true);
+            _createImmutablePosition(
+                _poolKey,
+                tickLower,
+                tickUpper,
+                _poolKey.currency0.balanceOf(address(positionManager)) - _tokenFees,
+                true
+            );
         }
 
         // Mark our position as closed
@@ -224,11 +237,11 @@ contract FairLaunch {
         PoolKey memory _poolKey,
         int _amountSpecified,
         bool _nativeIsZero
-    ) public onlyPositionManager returns (
-        BeforeSwapDelta beforeSwapDelta_,
-        BalanceDelta balanceDelta_,
-        FairLaunchInfo memory fairLaunchInfo_
-    ) {
+    )
+        public
+        onlyPositionManager
+        returns (BeforeSwapDelta beforeSwapDelta_, BalanceDelta balanceDelta_, FairLaunchInfo memory fairLaunchInfo_)
+    {
         PoolId poolId = _poolKey.toId();
         FairLaunchInfo storage info = _fairLaunchInfo[poolId];
 
@@ -324,18 +337,22 @@ contract FairLaunch {
         bool _tokenIsZero
     ) internal {
         // Calculate the liquidity delta based on the tick range and token amount
-        uint128 liquidityDelta = _tokenIsZero ? LiquidityAmounts.getLiquidityForAmount0({
-            sqrtPriceAX96: TickMath.getSqrtPriceAtTick(_tickLower),
-            sqrtPriceBX96: TickMath.getSqrtPriceAtTick(_tickUpper),
-            amount0: _tokens
-        }) : LiquidityAmounts.getLiquidityForAmount1({
-            sqrtPriceAX96: TickMath.getSqrtPriceAtTick(_tickLower),
-            sqrtPriceBX96: TickMath.getSqrtPriceAtTick(_tickUpper),
-            amount1: _tokens
-        });
+        uint128 liquidityDelta = _tokenIsZero
+            ? LiquidityAmounts.getLiquidityForAmount0({
+                sqrtPriceAX96: TickMath.getSqrtPriceAtTick(_tickLower),
+                sqrtPriceBX96: TickMath.getSqrtPriceAtTick(_tickUpper),
+                amount0: _tokens
+            })
+            : LiquidityAmounts.getLiquidityForAmount1({
+                sqrtPriceAX96: TickMath.getSqrtPriceAtTick(_tickLower),
+                sqrtPriceBX96: TickMath.getSqrtPriceAtTick(_tickUpper),
+                amount1: _tokens
+            });
 
         // If we have no liquidity, then exit before creating the position which would revert
-        if (liquidityDelta == 0) return;
+        if (liquidityDelta == 0) {
+            return;
+        }
 
         // Create our single-sided position
         (BalanceDelta delta,) = poolManager.modifyLiquidity({
@@ -376,9 +393,7 @@ contract FairLaunch {
         uint _baseAmount,
         address _baseToken,
         address _quoteToken
-    ) internal pure returns (
-        uint quoteAmount_
-    ) {
+    ) internal pure returns (uint quoteAmount_) {
         uint160 sqrtPriceX96 = TickMath.getSqrtPriceAtTick(_tick);
 
         // Calculate `quoteAmount` with better precision if it doesn't overflow when multiplied
@@ -399,9 +414,10 @@ contract FairLaunch {
     /**
      * Ensures that only the immutable {PositionManager} can call the function.
      */
-    modifier onlyPositionManager {
-        if (msg.sender != positionManager) revert NotPositionManager();
+    modifier onlyPositionManager() {
+        if (msg.sender != positionManager) {
+            revert NotPositionManager();
+        }
         _;
     }
-
 }

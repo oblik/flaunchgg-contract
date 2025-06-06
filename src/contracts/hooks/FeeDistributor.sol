@@ -4,26 +4,25 @@ pragma solidity ^0.8.26;
 import {Ownable} from '@solady/auth/Ownable.sol';
 import {SafeTransferLib} from '@solady/utils/SafeTransferLib.sol';
 
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
 import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
 import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
 
 import {FeeExemptions} from '@flaunch/hooks/FeeExemptions.sol';
-import {MemecoinFinder} from '@flaunch/types/MemecoinFinder.sol';
+
 import {ReferralEscrow} from '@flaunch/referrals/ReferralEscrow.sol';
+import {MemecoinFinder} from '@flaunch/types/MemecoinFinder.sol';
 
-import {IFeeCalculator} from '@flaunch-interfaces/IFeeCalculator.sol';
 import {IFLETH} from '@flaunch-interfaces/IFLETH.sol';
+import {IFeeCalculator} from '@flaunch-interfaces/IFeeCalculator.sol';
 import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
-
 
 /**
  * This hook will allow our pools to have a range of fee distribution approaches. This will
  * fallback onto a global fee distribution if there is not a specific.
  */
 abstract contract FeeDistributor is Ownable {
-
     using MemecoinFinder for PoolKey;
     using PoolIdLibrary for PoolKey;
 
@@ -89,17 +88,17 @@ abstract contract FeeDistributor is Ownable {
 
     /// Maps the creators share of the fee distribution that can be set by the creator
     /// to reduce fees from hitting the bidwall.
-    mapping (PoolId _poolId => uint24 _creatorFee) internal creatorFee;
+    mapping(PoolId _poolId => uint24 _creatorFee) internal creatorFee;
 
     /// Maps a user to an ETH equivalent token balance available in escrow
-    mapping (address _recipient => uint _amount) public balances;
+    mapping(address _recipient => uint _amount) public balances;
 
     /// Maps individual pools to custom `FeeDistribution`s. These will overwrite the
     /// global `feeDistribution`.
-    mapping (PoolId _poolId => FeeDistribution _feeDistribution) internal poolFeeDistribution;
+    mapping(PoolId _poolId => FeeDistribution _feeDistribution) internal poolFeeDistribution;
 
     /// Maps our IERC20 token addresses to their registered PoolKey
-    mapping (address _memecoin => PoolKey _poolKey) internal _poolKeys;
+    mapping(address _memecoin => PoolKey _poolKey) internal _poolKeys;
 
     /// The global FeeDistribution that will be applied to all pools
     FeeDistribution internal feeDistribution;
@@ -124,7 +123,12 @@ abstract contract FeeDistributor is Ownable {
      * @param _feeDistribution The initial FeeDistribution value
      * @param _protocolOwner The initial EOA owner of the contract
      */
-    constructor (address _nativeToken, FeeDistribution memory _feeDistribution, address _protocolOwner, address _flayGovernance) {
+    constructor(
+        address _nativeToken,
+        FeeDistribution memory _feeDistribution,
+        address _protocolOwner,
+        address _flayGovernance
+    ) {
         nativeToken = _nativeToken;
 
         // Set our initial fee distribution
@@ -151,10 +155,14 @@ abstract contract FeeDistributor is Ownable {
      */
     function _allocateFees(PoolId _poolId, address _recipient, uint _amount) internal {
         // If we don't have fees to allocate, exit early
-        if (_amount == 0) return;
+        if (_amount == 0) {
+            return;
+        }
 
         // Ensure we aren't trying to allocate fees to a zero address
-        if (_recipient == address(0)) revert RecipientZeroAddress();
+        if (_recipient == address(0)) {
+            revert RecipientZeroAddress();
+        }
 
         balances[_recipient] += _amount;
         emit Deposit(_poolId, _recipient, nativeToken, _amount);
@@ -171,7 +179,9 @@ abstract contract FeeDistributor is Ownable {
         uint amount = balances[msg.sender];
 
         // If there are no fees to withdraw, exit early
-        if (amount == 0) return;
+        if (amount == 0) {
+            return;
+        }
 
         // Reset our user's balance to prevent reentry
         balances[msg.sender] = 0;
@@ -212,9 +222,7 @@ abstract contract FeeDistributor is Ownable {
         Currency _swapFeeCurrency,
         uint _swapAmount,
         FeeExemptions.FeeExemption memory _feeExemption
-    ) internal returns (
-        uint swapFee_
-    ) {
+    ) internal returns (uint swapFee_) {
         // If we have an empty swapAmount then we can exit early
         if (_swapAmount == 0) {
             return swapFee_;
@@ -315,7 +323,10 @@ abstract contract FeeDistributor is Ownable {
      * @return creator_ The amount that the token creator will receive
      * @return protocol_ The amount that the protocol will receive
      */
-    function feeSplit(PoolId _poolId, uint _amount) public view returns (uint bidWall_, uint creator_, uint protocol_) {
+    function feeSplit(
+        PoolId _poolId,
+        uint _amount
+    ) public view returns (uint bidWall_, uint creator_, uint protocol_) {
         // Check if we have a pool overwrite for the FeeDistribution
         FeeDistribution memory _poolFeeDistribution = getPoolFeeDistribution(_poolId);
 
@@ -341,7 +352,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @param _referralEscrow The new {ReferralEscrow} contract address
      */
-    function setReferralEscrow(address payable _referralEscrow) public onlyOwner {
+    function setReferralEscrow(
+        address payable _referralEscrow
+    ) public onlyOwner {
         // Update our {ReferralEscrow} address
         referralEscrow = ReferralEscrow(_referralEscrow);
         emit ReferralEscrowUpdated(_referralEscrow);
@@ -352,7 +365,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @param _feeDistribution The new FeeDistribution value
      */
-    function setFeeDistribution(FeeDistribution memory _feeDistribution) public onlyOwner {
+    function setFeeDistribution(
+        FeeDistribution memory _feeDistribution
+    ) public onlyOwner {
         _validateFeeDistribution(_feeDistribution);
 
         // Update our FeeDistribution struct
@@ -365,7 +380,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @param _protocol New protocol fee
      */
-    function setProtocolFeeDistribution(uint24 _protocol) public {
+    function setProtocolFeeDistribution(
+        uint24 _protocol
+    ) public {
         // Check that the caller is the $FLAY governance
         if (msg.sender != flayGovernance) {
             revert Unauthorized();
@@ -402,7 +419,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @param _feeDistribution The FeeDistribution to be validated
      */
-    function _validateFeeDistribution(FeeDistribution memory _feeDistribution) internal pure {
+    function _validateFeeDistribution(
+        FeeDistribution memory _feeDistribution
+    ) internal pure {
         // Ensure our swap fee is below 100%
         if (_feeDistribution.swapFee > ONE_HUNDRED_PERCENT) {
             revert SwapFeeInvalid();
@@ -424,7 +443,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @param _feeCalculator The new {IFeeCalculator} to use
      */
-    function setFeeCalculator(IFeeCalculator _feeCalculator) public onlyOwner {
+    function setFeeCalculator(
+        IFeeCalculator _feeCalculator
+    ) public onlyOwner {
         feeCalculator = _feeCalculator;
         emit FeeCalculatorUpdated(address(_feeCalculator));
     }
@@ -435,7 +456,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @param _feeCalculator The new {IFeeCalculator} to use
      */
-    function setFairLaunchFeeCalculator(IFeeCalculator _feeCalculator) public onlyOwner {
+    function setFairLaunchFeeCalculator(
+        IFeeCalculator _feeCalculator
+    ) public onlyOwner {
         fairLaunchFeeCalculator = _feeCalculator;
         emit FairLaunchFeeCalculatorUpdated(address(_feeCalculator));
     }
@@ -448,7 +471,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @return feeDistribution_ The FeeDistribution applied to the pool
      */
-    function getPoolFeeDistribution(PoolId _poolId) public view returns (FeeDistribution memory feeDistribution_) {
+    function getPoolFeeDistribution(
+        PoolId _poolId
+    ) public view returns (FeeDistribution memory feeDistribution_) {
         feeDistribution_ = (poolFeeDistribution[_poolId].active) ? poolFeeDistribution[_poolId] : feeDistribution;
     }
 
@@ -462,7 +487,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * @return IFeeCalculator The IFeeCalculator to use
      */
-    function getFeeCalculator(bool _isFairLaunch) public view returns (IFeeCalculator) {
+    function getFeeCalculator(
+        bool _isFairLaunch
+    ) public view returns (IFeeCalculator) {
         if (_isFairLaunch && address(fairLaunchFeeCalculator) != address(0)) {
             return fairLaunchFeeCalculator;
         }
@@ -473,6 +500,5 @@ abstract contract FeeDistributor is Ownable {
     /**
      * Allows the contract to receive ETH when withdrawn from the flETH token.
      */
-    receive () external payable {}
-
+    receive() external payable {}
 }

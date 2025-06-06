@@ -4,39 +4,43 @@ pragma solidity ^0.8.26;
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 import {FullMath} from '@uniswap/v4-core/src/libraries/FullMath.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
-import {PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+
 import {TickMath} from '@uniswap/v4-core/src/libraries/TickMath.sol';
+import {PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
 
 import {Flaunch} from '@flaunch/Flaunch.sol';
-import {FlaunchPremineZap} from '@flaunch/zaps/FlaunchPremineZap.sol';
-import {InitialPrice} from '@flaunch/price/InitialPrice.sol';
+
 import {PositionManager} from '@flaunch/PositionManager.sol';
 import {TokenSupply} from '@flaunch/libraries/TokenSupply.sol';
+import {InitialPrice} from '@flaunch/price/InitialPrice.sol';
+import {FlaunchPremineZap} from '@flaunch/zaps/FlaunchPremineZap.sol';
 
 import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
 
 import {FlaunchTest} from 'test/FlaunchTest.sol';
 
-
 contract FlaunchPremineZapTests is FlaunchTest {
-
     using PoolIdLibrary for PoolKey;
 
     constructor() {
         _deployPlatform();
     }
 
-    function test_CanPremineTokens(bool _flipped) external flipTokens(_flipped) {
+    function test_CanPremineTokens(
+        bool _flipped
+    ) external flipTokens(_flipped) {
         // Ensure we have a valid initial supply & premine amount
         uint _supply = 0.25e27;
         uint _premineAmount = supplyShare(5);
 
         // Set a market cap tick that is roughly equal to 2e18 : 1e27
-        initialPrice.setSqrtPriceX96(InitialPrice.InitialSqrtPriceX96({
-            unflipped: TickMath.getSqrtPriceAtTick(200703),
-            flipped: TickMath.getSqrtPriceAtTick(-200704)
-        }));
+        initialPrice.setSqrtPriceX96(
+            InitialPrice.InitialSqrtPriceX96({
+                unflipped: TickMath.getSqrtPriceAtTick(200703),
+                flipped: TickMath.getSqrtPriceAtTick(-200704)
+            })
+        );
 
         // {PoolManager} must have some initial flETH balance to serve `take()` requests in our hook
         deal(address(flETH), address(poolManager), 1000e27 ether);
@@ -50,7 +54,16 @@ contract FlaunchPremineZapTests is FlaunchTest {
         // Create our Memecoin, sending all ETH to account for residue as well
         (address memecoin, uint ethSpent) = premineZap.flaunch{value: ethRequired}(
             PositionManager.FlaunchParams(
-                'name', 'symbol', 'https://token.gg/', _supply, _premineAmount, address(this), 0, 0, abi.encode(''), abi.encode(1_000)
+                'name',
+                'symbol',
+                'https://token.gg/',
+                _supply,
+                _premineAmount,
+                address(this),
+                0,
+                0,
+                abi.encode(''),
+                abi.encode(1_000)
             )
         );
 
@@ -79,17 +92,20 @@ contract FlaunchPremineZapTests is FlaunchTest {
         _supply = bound(_supply, supplyShare(10), flaunch.MAX_FAIR_LAUNCH_TOKENS());
         vm.assume(_premineAmount > _supply);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Flaunch.PremineExceedsInitialAmount.selector,
-                _premineAmount,
-                _supply
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Flaunch.PremineExceedsInitialAmount.selector, _premineAmount, _supply));
 
         premineZap.flaunch(
             PositionManager.FlaunchParams(
-                'name', 'symbol', 'https://token.gg/', _supply, _premineAmount, address(this), 0, 0, abi.encode(''), abi.encode(1_000)
+                'name',
+                'symbol',
+                'https://token.gg/',
+                _supply,
+                _premineAmount,
+                address(this),
+                0,
+                0,
+                abi.encode(''),
+                abi.encode(1_000)
             )
         );
     }
@@ -123,5 +139,4 @@ contract FlaunchPremineZapTests is FlaunchTest {
         ethRequired = premineZap.calculateFee(supplyShare(10_00), 0, abi.encode(''));
         assertEq(ethRequired, 0.2 ether + 0.002 ether + 0.001 ether);
     }
-
 }

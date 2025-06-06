@@ -4,29 +4,30 @@ pragma solidity ^0.8.26;
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
-import {toBeforeSwapDelta} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
-import {PoolIdLibrary, PoolId} from '@uniswap/v4-core/src/types/PoolId.sol';
-import {Hooks, IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
-import {TickMath} from '@uniswap/v4-core/src/libraries/TickMath.sol';
 
-import {FairLaunch} from '@flaunch/hooks/FairLaunch.sol';
+import {Hooks, IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
+
+import {TickMath} from '@uniswap/v4-core/src/libraries/TickMath.sol';
+import {toBeforeSwapDelta} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
+import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
+
 import {Flaunch} from '@flaunch/Flaunch.sol';
-import {InitialPrice} from '@flaunch/price/InitialPrice.sol';
+
 import {PositionManager} from '@flaunch/PositionManager.sol';
+import {FairLaunch} from '@flaunch/hooks/FairLaunch.sol';
 import {TokenSupply} from '@flaunch/libraries/TokenSupply.sol';
+import {InitialPrice} from '@flaunch/price/InitialPrice.sol';
 
 import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
 
 import {FlaunchTest} from './FlaunchTest.sol';
 
-
 contract PositionManagerTest is FlaunchTest {
-
     using PoolIdLibrary for PoolKey;
 
-    constructor () {
+    constructor() {
         // Deploy our platform
         _deployPlatform();
     }
@@ -150,8 +151,10 @@ contract PositionManagerTest is FlaunchTest {
         );
     }
 
-    function test_CannotScheduleFlaunchWithLargeDuration(uint _duration) public {
-        vm.assume(_duration < type(uint256).max - block.timestamp && _duration > flaunch.MAX_SCHEDULE_DURATION());
+    function test_CannotScheduleFlaunchWithLargeDuration(
+        uint _duration
+    ) public {
+        vm.assume(_duration < type(uint).max - block.timestamp && _duration > flaunch.MAX_SCHEDULE_DURATION());
 
         vm.expectRevert();
         positionManager.flaunch(
@@ -447,10 +450,16 @@ contract PositionManagerTest is FlaunchTest {
         flaunch.burn(tokenId);
     }
 
-    function test_CannotFlaunchWithInvalidCreatorFeeAllocation(uint24 _creatorFeeAllocation) public {
+    function test_CannotFlaunchWithInvalidCreatorFeeAllocation(
+        uint24 _creatorFeeAllocation
+    ) public {
         vm.assume(_creatorFeeAllocation > 100_00);
 
-        vm.expectRevert(abi.encodeWithSelector(Flaunch.CreatorFeeAllocationInvalid.selector, _creatorFeeAllocation, flaunch.MAX_CREATOR_ALLOCATION()));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Flaunch.CreatorFeeAllocationInvalid.selector, _creatorFeeAllocation, flaunch.MAX_CREATOR_ALLOCATION()
+            )
+        );
         positionManager.flaunch(
             PositionManager.FlaunchParams({
                 name: 'Token Name',
@@ -466,5 +475,4 @@ contract PositionManagerTest is FlaunchTest {
             })
         );
     }
-
 }

@@ -5,10 +5,11 @@ import {Ownable} from '@solady/auth/Ownable.sol';
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
+import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
+import {IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
 import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
 import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
-import {IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
-import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
+
 import {PoolId} from '@uniswap/v4-core/src/types/PoolId.sol';
 import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
 
@@ -16,14 +17,12 @@ import {PoolSwap} from '@flaunch/zaps/PoolSwap.sol';
 
 import {IFLETH} from '@flaunch-interfaces/IFLETH.sol';
 
-
 /**
  * When a user referrers someone that then actions a swap, their address is passed in the `hookData`. This
  * user will then receive a referral fee of the unspecified token amount. This amount will be moved to this
  * escrow contract to be claimed at a later time.
  */
 contract ReferralEscrow is Ownable {
-
     error MismatchedTokensAndLimits();
 
     /// Event emitted when tokens are assigned to a user
@@ -45,7 +44,7 @@ contract ReferralEscrow is Ownable {
     address public immutable positionManager;
 
     /// Mapping to track token allocations by user and token
-    mapping (address _user => mapping (address _token => uint _amount)) public allocations;
+    mapping(address _user => mapping(address _token => uint _amount)) public allocations;
 
     /**
      * Constructor to initialize the PoolSwap contract address.
@@ -53,7 +52,7 @@ contract ReferralEscrow is Ownable {
      * @param _nativeToken The native token used by the Flaunch protocol
      * @param _positionManager The Flaunch {PositionManager} address
      */
-    constructor (address _nativeToken, address _positionManager) {
+    constructor(address _nativeToken, address _positionManager) {
         nativeToken = _nativeToken;
         positionManager = _positionManager;
 
@@ -65,7 +64,9 @@ contract ReferralEscrow is Ownable {
      *
      * @param _poolSwap The new address that will handle pool swaps
      */
-    function setPoolSwap(address _poolSwap) external onlyOwner {
+    function setPoolSwap(
+        address _poolSwap
+    ) external onlyOwner {
         poolSwap = PoolSwap(_poolSwap);
     }
 
@@ -81,10 +82,14 @@ contract ReferralEscrow is Ownable {
      */
     function assignTokens(PoolId _poolId, address _user, address _token, uint _amount) external {
         // Ensure that the caller is the {PositionManager}
-        if (msg.sender != positionManager) revert Unauthorized();
+        if (msg.sender != positionManager) {
+            revert Unauthorized();
+        }
 
         // If no amount is passed, then we have nothing to process
-        if (_amount == 0) return;
+        if (_amount == 0) {
+            return;
+        }
 
         allocations[_user][_token] += _amount;
         emit TokensAssigned(_poolId, _user, _token, _amount);
@@ -103,7 +108,9 @@ contract ReferralEscrow is Ownable {
             amount = allocations[msg.sender][token];
 
             // If there is nothing to claim, skip next steps
-            if (amount == 0) continue;
+            if (amount == 0) {
+                continue;
+            }
 
             // Update allocation before transferring to prevent reentrancy attacks
             allocations[msg.sender][token] = 0;
@@ -130,10 +137,16 @@ contract ReferralEscrow is Ownable {
      * @param _tokens The tokens that are being claimed and swapped
      * @param _sqrtPriceX96Limits The respective token's sqrtPriceX96 limit
      */
-    function claimAndSwap(address[] calldata _tokens, uint160[] calldata _sqrtPriceX96Limits, address payable _recipient) external {
+    function claimAndSwap(
+        address[] calldata _tokens,
+        uint160[] calldata _sqrtPriceX96Limits,
+        address payable _recipient
+    ) external {
         // Ensure that we have a limit for each token
         uint tokensLength = _tokens.length;
-        if (tokensLength > _sqrtPriceX96Limits.length) revert MismatchedTokensAndLimits();
+        if (tokensLength > _sqrtPriceX96Limits.length) {
+            revert MismatchedTokensAndLimits();
+        }
 
         address token;
         uint amount;
@@ -144,7 +157,9 @@ contract ReferralEscrow is Ownable {
             amount = allocations[msg.sender][token];
 
             // If no tokens are available, skip the claim
-            if (amount == 0) continue;
+            if (amount == 0) {
+                continue;
+            }
 
             // Update allocation before transferring to prevent reentrancy attacks
             allocations[msg.sender][token] = 0;
@@ -203,5 +218,4 @@ contract ReferralEscrow is Ownable {
      * Allows the contract to receive ETH from the flETH withdrawal.
      */
     receive() external payable {}
-
 }

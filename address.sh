@@ -2,7 +2,7 @@
 
 mkdir -p addresses
 
-find broadcast/DeployBase.sol -name "run-latest.json" | while read -r input_file; do
+find broadcast/Deploy.s.sol -name "run-latest.json" | while read -r input_file; do
     if [ -z "$input_file" ]; then
         echo "No run-latest.json files found."
         continue

@@ -5,35 +5,41 @@ import {SafeTransferLib} from '@solady/utils/SafeTransferLib.sol';
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
-import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
-import {BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
-import {Hooks, IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
-import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
+import {Hooks, IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
+
 import {SafeCast} from '@uniswap/v4-core/src/libraries/SafeCast.sol';
 import {StateLibrary} from '@uniswap/v4-core/src/libraries/StateLibrary.sol';
+import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
+import {
+    BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta
+} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
+import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
 
 import {BaseHook} from '@uniswap-periphery/base/hooks/BaseHook.sol';
 
 import {BidWall} from '@flaunch/bidwall/BidWall.sol';
-import {CurrencySettler} from '@flaunch/libraries/CurrencySettler.sol';
+
 import {FairLaunch} from '@flaunch/hooks/FairLaunch.sol';
 import {FeeDistributor} from '@flaunch/hooks/FeeDistributor.sol';
 import {FeeExemptions} from '@flaunch/hooks/FeeExemptions.sol';
 import {InternalSwapPool} from '@flaunch/hooks/InternalSwapPool.sol';
-import {MemecoinFinder} from '@flaunch/types/MemecoinFinder.sol';
-import {MemecoinTreasury} from '@flaunch/treasury/MemecoinTreasury.sol';
+
 import {Notifier} from '@flaunch/hooks/Notifier.sol';
-import {StoreKeys} from '@flaunch/types/StoreKeys.sol';
+import {CurrencySettler} from '@flaunch/libraries/CurrencySettler.sol';
+
 import {TreasuryActionManager} from '@flaunch/treasury/ActionManager.sol';
+import {MemecoinTreasury} from '@flaunch/treasury/MemecoinTreasury.sol';
+import {MemecoinFinder} from '@flaunch/types/MemecoinFinder.sol';
+
+import {StoreKeys} from '@flaunch/types/StoreKeys.sol';
 
 import {IFeeCalculator} from '@flaunch-interfaces/IFeeCalculator.sol';
 import {IFlaunch} from '@flaunch-interfaces/IFlaunch.sol';
 import {IInitialPrice} from '@flaunch-interfaces/IInitialPrice.sol';
 import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
-
 
 /**
  * The PositionManager is a Uniswap V4 hook that controls the user journey from token creation,
@@ -47,7 +53,6 @@ import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
  * within comments using square brackets where possible.
  */
 contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys {
-
     using BeforeSwapDeltaLibrary for BeforeSwapDelta;
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
@@ -62,16 +67,45 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
     error UnknownPool(PoolId _poolId);
 
     /// Emitted when a Flaunch pool is created
-    event PoolCreated(PoolId indexed _poolId, address _memecoin, address _memecoinTreasury, uint _tokenId, bool _currencyFlipped, uint _flaunchFee, FlaunchParams _params);
+    event PoolCreated(
+        PoolId indexed _poolId,
+        address _memecoin,
+        address _memecoinTreasury,
+        uint _tokenId,
+        bool _currencyFlipped,
+        uint _flaunchFee,
+        FlaunchParams _params
+    );
 
     /// Emitted when a Flaunch pool is scheduled
     event PoolScheduled(PoolId indexed _poolId, uint _flaunchesAt);
 
     /// Emitted when a pool swap occurs
-    event PoolSwap(PoolId indexed poolId, int flAmount0, int flAmount1, int flFee0, int flFee1, int ispAmount0, int ispAmount1, int ispFee0, int ispFee1, int uniAmount0, int uniAmount1, int uniFee0, int uniFee1);
+    event PoolSwap(
+        PoolId indexed poolId,
+        int flAmount0,
+        int flAmount1,
+        int flFee0,
+        int flFee1,
+        int ispAmount0,
+        int ispAmount1,
+        int ispFee0,
+        int ispFee1,
+        int uniAmount0,
+        int uniAmount1,
+        int uniFee0,
+        int uniFee1
+    );
 
     /// Emitted after any transaction to share pool state
-    event PoolStateUpdated(PoolId indexed _poolId, uint160 _sqrtPriceX96, int24 _tick, uint24 _protocolFee, uint24 _swapFee, uint128 _liquidity);
+    event PoolStateUpdated(
+        PoolId indexed _poolId,
+        uint160 _sqrtPriceX96,
+        int24 _tick,
+        uint24 _protocolFee,
+        uint24 _swapFee,
+        uint128 _liquidity
+    );
 
     /// Emitted when a user successfully premines their token
     event PoolPremine(PoolId indexed _poolId, int _premineAmount);
@@ -172,15 +206,17 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
     Notifier public notifier;
 
     /// Store the block timestamp when a poolId is set to launch
-    mapping (PoolId _poolId => uint _flaunchTime) public flaunchesAt;
+    mapping(PoolId _poolId => uint _flaunchTime) public flaunchesAt;
 
     /// Store the premine information for a pool
-    mapping (PoolId _poolId => PoolPremineInfo _premineInfo) public premineInfo;
+    mapping(PoolId _poolId => PoolPremineInfo _premineInfo) public premineInfo;
 
     /**
      * Initializes our {BaseHook} contract and initializes all implemented hooks.
      */
-    constructor (ConstructorParams memory params)
+    constructor(
+        ConstructorParams memory params
+    )
         BaseHook(params.poolManager)
         FeeDistributor(params.nativeToken, params.feeDistribution, params.protocolOwner, params.flayGovernance)
     {
@@ -218,7 +254,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return memecoin_ The created ERC20 token address
      */
-    function flaunch(FlaunchParams calldata _params) external payable returns (address memecoin_) {
+    function flaunch(
+        FlaunchParams calldata _params
+    ) external payable returns (address memecoin_) {
         uint tokenId;
         address payable memecoinTreasury;
 
@@ -238,7 +276,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         });
 
         // Initialize the {MemecoinTreasury} with `PoolKey`
-        MemecoinTreasury(memecoinTreasury).initialize(payable(address(this)), address(actionManager), nativeToken, _poolKey);
+        MemecoinTreasury(memecoinTreasury).initialize(
+            payable(address(this)), address(actionManager), nativeToken, _poolKey
+        );
 
         // Set the PoolKey to storage
         _poolKeys[memecoin_] = _poolKey;
@@ -261,8 +301,7 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
 
         // Initialize our memecoin with the sqrtPriceX96
         int24 initialTick = poolManager.initialize(
-            _poolKey,
-            initialPrice.getSqrtPriceX96(msg.sender, currencyFlipped, _params.initialPriceParams)
+            _poolKey, initialPrice.getSqrtPriceX96(msg.sender, currencyFlipped, _params.initialPriceParams)
         );
 
         // Check if we have an initial flaunching fee, check that enough ETH has been sent
@@ -282,18 +321,14 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
          * [PREMINE] If the creator has requested tokens from their initial fair launch
          * allocation, which they can purchase in the same transaction.
          */
-
         if (_params.premineAmount != 0) {
-            premineInfo[poolId] = PoolPremineInfo({
-                amountSpecified: _params.premineAmount.toInt256(),
-                blockNumber: block.number
-            });
+            premineInfo[poolId] =
+                PoolPremineInfo({amountSpecified: _params.premineAmount.toInt256(), blockNumber: block.number});
         }
 
         /**
          * [FL] At token creation, x% of token supply is put into a one-sided position.
          */
-
         if (_params.initialTokenFairLaunch != 0) {
             fairLaunch.createPosition(
                 poolId,
@@ -311,7 +346,6 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         /**
          * [SCHEDULE] If we have a timestamp in the future, then we set our schedule mapping.
          */
-
         if (_params.flaunchAt > block.timestamp) {
             flaunchesAt[poolId] = _params.flaunchAt;
             emit PoolScheduled(poolId, _params.flaunchAt);
@@ -352,7 +386,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return The corresponding {PoolKey} for the token
      */
-    function poolKey(address _token) external view returns (PoolKey memory) {
+    function poolKey(
+        address _token
+    ) external view returns (PoolKey memory) {
         return _poolKeys[_token];
     }
 
@@ -389,7 +425,11 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      * @dev As we call `poolManager.initialize` from the IHooks contract itself, we bypass this
      * hook call as therefore bypass the prevention.
      */
-    function beforeInitialize(address, PoolKey calldata, uint160) external view override onlyPoolManager returns (bytes4) {
+    function beforeInitialize(
+        address,
+        PoolKey calldata,
+        uint160
+    ) external view override onlyPoolManager returns (bytes4) {
         revert CannotBeInitializedDirectly();
     }
 
@@ -404,7 +444,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      * @param _hookData Arbitrary data handed into the PoolManager by the swapper to be be passed on to the hook
      *
      * @return selector_ The function selector for the hook
-     * @return beforeSwapDelta_ The hook's delta in specified and unspecified currencies. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     * @return beforeSwapDelta_ The hook's delta in specified and unspecified currencies. Positive: the hook is
+     * owed/took currency, negative: the hook owes/sent currency
      * @return swapFee_ The percentage fee applied to our swap
      */
     function beforeSwap(
@@ -412,16 +453,11 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         PoolKey calldata _key,
         IPoolManager.SwapParams memory _params,
         bytes calldata _hookData
-    ) public override onlyPoolManager returns (
-        bytes4 selector_,
-        BeforeSwapDelta beforeSwapDelta_,
-        uint24
-    ) {
+    ) public override onlyPoolManager returns (bytes4 selector_, BeforeSwapDelta beforeSwapDelta_, uint24) {
         /**
          * [SCHEDULE][PREMINE] Check if the token is scheduled to be flaunched and only
          * allow a swap to take place if there is a premine call available.
          */
-
         {
             PoolId poolId = _key.toId();
 
@@ -435,7 +471,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
                 // The validity of a premine ensures that we are in the same block and that the
                 // amount specified is the same. We cannot check that the caller is the same as
                 // the `_sender` is obfuscated to be the swap contract.
-                if (_premineInfo.blockNumber == block.number && _params.amountSpecified == _premineInfo.amountSpecified) {
+                if (_premineInfo.blockNumber == block.number && _params.amountSpecified == _premineInfo.amountSpecified)
+                {
                     emit PoolPremine(poolId, _premineInfo.amountSpecified);
                     _premineInfo.blockNumber = 0;
                 } else {
@@ -460,21 +497,17 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
              * [FL] If the FairLaunch window has ended, but our position is still open, then we
              * need to close the position.
              */
-
             if (!fairLaunch.inFairLaunchWindow(poolId)) {
                 fairLaunch.closePosition({
                     _poolKey: _key,
                     _tokenFees: _poolFees[poolId].amount1,
                     _nativeIsZero: nativeIsZero
                 });
-            }
-            else {
-
+            } else {
                 /**
                  * [FL] If we are still in the FairLaunch window, then we need to prevent any swaps that
                  * are specified to sell the {Memecoin}.
                  */
-
                 if (nativeIsZero != _params.zeroForOne) {
                     revert FairLaunch.CannotSellTokenDuringFairLaunch();
                 }
@@ -488,7 +521,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
 
                 // Try to fill from FL at specific tick
                 BalanceDelta fairLaunchFillDelta;
-                (beforeSwapDelta_, fairLaunchFillDelta, fairLaunchInfo) = fairLaunch.fillFromPosition(_key, _params.amountSpecified, nativeIsZero);
+                (beforeSwapDelta_, fairLaunchFillDelta, fairLaunchInfo) =
+                    fairLaunch.fillFromPosition(_key, _params.amountSpecified, nativeIsZero);
 
                 // Give the tokens to Uniswap V4 so that it can play good-cop and give them to the user
                 _settleDelta(_key, fairLaunchFillDelta);
@@ -499,7 +533,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
                  */
 
                 // We need to capture fees from our internal swap at this point
-                uint swapFee = _captureAndDepositFees(_key, _params, _sender, beforeSwapDelta_.getUnspecifiedDelta(), _hookData);
+                uint swapFee =
+                    _captureAndDepositFees(_key, _params, _sender, beforeSwapDelta_.getUnspecifiedDelta(), _hookData);
 
                 // Increment our swap
                 _captureDelta(_params, TS_FL_AMOUNT0, TS_FL_AMOUNT1, beforeSwapDelta_);
@@ -507,8 +542,7 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
 
                 // Increase the delta being sent back
                 beforeSwapDelta_ = toBeforeSwapDelta(
-                    beforeSwapDelta_.getSpecifiedDelta(),
-                    beforeSwapDelta_.getUnspecifiedDelta() + swapFee.toInt128()
+                    beforeSwapDelta_.getSpecifiedDelta(), beforeSwapDelta_.getUnspecifiedDelta() + swapFee.toInt128()
                 );
 
                 // A FairLaunch transaction will always facilitate purchasing Memecoin with
@@ -539,8 +573,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
          * ahead of our fee distribution. This acts as a partial orderbook to remove impact against
          * our pool.
          */
-
-        (uint tokenIn, uint tokenOut) = _internalSwap(poolManager, _key, _params, nativeToken == Currency.unwrap(_key.currency0));
+        (uint tokenIn, uint tokenOut) =
+            _internalSwap(poolManager, _key, _params, nativeToken == Currency.unwrap(_key.currency0));
         if (tokenIn + tokenOut != 0) {
             // Update our hook delta to reduce the upcoming swap amount to show that we have
             // already spent some of the ETH and received some of the underlying ERC20.
@@ -554,7 +588,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
              */
 
             // We need to capture fees from our internal swap at this point
-            uint swapFee = _captureAndDepositFees(_key, _params, _sender, internalBeforeSwapDelta.getUnspecifiedDelta(), _hookData);
+            uint swapFee =
+                _captureAndDepositFees(_key, _params, _sender, internalBeforeSwapDelta.getUnspecifiedDelta(), _hookData);
 
             // Increment our swap
             _captureDelta(_params, TS_ISP_AMOUNT0, TS_ISP_AMOUNT1, internalBeforeSwapDelta);
@@ -563,7 +598,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
             // Increase the delta being sent back
             beforeSwapDelta_ = toBeforeSwapDelta(
                 beforeSwapDelta_.getSpecifiedDelta() + internalBeforeSwapDelta.getSpecifiedDelta(),
-                beforeSwapDelta_.getUnspecifiedDelta() + internalBeforeSwapDelta.getUnspecifiedDelta() + swapFee.toInt128()
+                beforeSwapDelta_.getUnspecifiedDelta() + internalBeforeSwapDelta.getUnspecifiedDelta()
+                    + swapFee.toInt128()
             );
         }
 
@@ -587,7 +623,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      * @param _hookData Arbitrary data handed into the PoolManager by the swapper to be be passed on to the hook
      *
      * @return selector_ The function selector for the hook
-     * @return hookDeltaUnspecified_ The hook's delta in unspecified currency. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     * @return hookDeltaUnspecified_ The hook's delta in unspecified currency. Positive: the hook is owed/took currency,
+     * negative: the hook owes/sent currency
      */
     function afterSwap(
         address _sender,
@@ -595,10 +632,7 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         IPoolManager.SwapParams calldata _params,
         BalanceDelta _delta,
         bytes calldata _hookData
-    ) public override onlyPoolManager returns (
-        bytes4 selector_,
-        int128 hookDeltaUnspecified_
-    ) {
+    ) public override onlyPoolManager returns (bytes4 selector_, int128 hookDeltaUnspecified_) {
         /**
          * [FD] We need to determine the amount of fees generated by our Uniswap swap to capture,
          * rather than sending the full amount to the end user.
@@ -622,14 +656,12 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         /**
          * [ISP] Distribute any fees that have been converted by the swap.
          */
-
         _distributeFees(_key);
 
         /**
          * [FD] If we have a feeCalculator, then we want to track the swap data for any
          * dynamic calculations.
          */
-
         PoolId poolId = _key.toId();
 
         {
@@ -665,9 +697,7 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         PoolKey calldata _key,
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) public view override onlyPoolManager returns (
-        bytes4 selector_
-    ) {
+    ) public view override onlyPoolManager returns (bytes4 selector_) {
         // [FL] If in fair launch window, we need to prevent liquidity being added
         _canModifyLiquidity(_key.toId(), _sender);
 
@@ -679,11 +709,13 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @param _sender The initial msg.sender for the add liquidity call
      * @param _key The key for the pool
-     * @param _delta The caller's balance delta after adding liquidity; the sum of principal delta, fees accrued, and hook delta
+     * @param _delta The caller's balance delta after adding liquidity; the sum of principal delta, fees accrued, and
+     * hook delta
      * @param _feesAccrued The fees accrued since the last time fees were collected from this position
      *
      * @return selector_ The function selector for the hook
-     * @return BalanceDelta The hook's delta in token0 and token1. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     * @return BalanceDelta The hook's delta in token0 and token1. Positive: the hook is owed/took currency, negative:
+     * the hook owes/sent currency
      */
     function afterAddLiquidity(
         address _sender,
@@ -692,10 +724,7 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         BalanceDelta _delta,
         BalanceDelta _feesAccrued,
         bytes calldata
-    ) external override onlyPoolManager returns (
-        bytes4 selector_,
-        BalanceDelta
-    ) {
+    ) external override onlyPoolManager returns (bytes4 selector_, BalanceDelta) {
         selector_ = IHooks.afterAddLiquidity.selector;
 
         // Emit our pool state update to listeners
@@ -715,9 +744,7 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
         PoolKey calldata _key,
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) public view override onlyPoolManager returns (
-        bytes4 selector_
-    ) {
+    ) public view override onlyPoolManager returns (bytes4 selector_) {
         // [FL] If in fair launch window, we need to prevent liquidity being removed
         _canModifyLiquidity(_key.toId(), _sender);
 
@@ -730,7 +757,8 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @param _sender The initial msg.sender for the remove liquidity call
      * @param _key The key for the pool
-     * @param _delta The caller's balance delta after removing liquidity; the sum of principal delta, fees accrued, and hook delta
+     * @param _delta The caller's balance delta after removing liquidity; the sum of principal delta, fees accrued, and
+     * hook delta
      * @param _feesAccrued The fees accrued since the last time fees were collected from this position
      *
      * @return selector_ The function selector for the hook
@@ -759,7 +787,13 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return selector_ The function selector for the hook
      */
-    function afterDonate(address _sender, PoolKey calldata _key, uint _amount0, uint _amount1, bytes calldata) external override onlyPoolManager returns (bytes4 selector_) {
+    function afterDonate(
+        address _sender,
+        PoolKey calldata _key,
+        uint _amount0,
+        uint _amount1,
+        bytes calldata
+    ) external override onlyPoolManager returns (bytes4 selector_) {
         selector_ = IHooks.afterDonate.selector;
 
         // Emit our pool state update to listeners
@@ -771,7 +805,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return The ETH value of the fee
      */
-    function getFlaunchingFee(bytes calldata _initialPriceParams) public view returns (uint) {
+    function getFlaunchingFee(
+        bytes calldata _initialPriceParams
+    ) public view returns (uint) {
         return initialPrice.getFlaunchingFee(msg.sender, _initialPriceParams);
     }
 
@@ -780,7 +816,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return The ETH market cap value
      */
-    function getFlaunchingMarketCap(bytes calldata _initialPriceParams) public view returns (uint) {
+    function getFlaunchingMarketCap(
+        bytes calldata _initialPriceParams
+    ) public view returns (uint) {
         return initialPrice.getMarketCap(_initialPriceParams);
     }
 
@@ -789,7 +827,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @param _flaunchContract The new {IFlaunch} contract address
      */
-    function setFlaunch(address _flaunchContract) public onlyOwner {
+    function setFlaunch(
+        address _flaunchContract
+    ) public onlyOwner {
         flaunchContract = IFlaunch(_flaunchContract);
     }
 
@@ -799,7 +839,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @param _initialPrice The contract address for the `IInitialPrice` contract
      */
-    function setInitialPrice(address _initialPrice) public onlyOwner {
+    function setInitialPrice(
+        address _initialPrice
+    ) public onlyOwner {
         initialPrice = IInitialPrice(_initialPrice);
         emit InitialPriceUpdated(_initialPrice);
     }
@@ -807,9 +849,13 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
     /**
      * Calls for the BidWall to be closed, as this requires callback from the {PoolManager}.
      */
-    function closeBidWall(PoolKey memory _key) public {
+    function closeBidWall(
+        PoolKey memory _key
+    ) public {
         // Ensure that the call is made by the BidWall which validates logic
-        if (msg.sender != address(bidWall)) revert CallerIsNotBidWall();
+        if (msg.sender != address(bidWall)) {
+            revert CallerIsNotBidWall();
+        }
 
         // Ensure that the PoolKey that is being closed is valid and recognised on the protocol,
         // otherwise we could processing issues and false positives in upcoming steps. We need to
@@ -832,7 +878,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return bytes Empty data; nothing will be returned
      */
-    function _unlockCallback(bytes calldata _data) internal override returns (bytes memory) {
+    function _unlockCallback(
+        bytes calldata _data
+    ) internal override returns (bytes memory) {
         bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
     }
 
@@ -905,14 +953,18 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @param _poolKey The PoolKey reference that will have fees distributed
      */
-    function _distributeFees(PoolKey memory _poolKey) internal {
+    function _distributeFees(
+        PoolKey memory _poolKey
+    ) internal {
         PoolId poolId = _poolKey.toId();
 
         // Get the amount of the native token available to distribute
         uint distributeAmount = _poolFees[poolId].amount0;
 
         // Ensure that the collection has sufficient fees available
-        if (distributeAmount < MIN_DISTRIBUTE_THRESHOLD) return;
+        if (distributeAmount < MIN_DISTRIBUTE_THRESHOLD) {
+            return;
+        }
 
         // Reduce our available fees for the pool
         _poolFees[poolId].amount0 = 0;
@@ -951,7 +1003,9 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
             if (bidWall.isBidWallEnabled(poolId) && !fairLaunch.inFairLaunchWindow(poolId)) {
                 // Otherwise, we can deposit directly into the BidWall as we have permission to modify
                 // liquidity outside of the window.
-                bidWall.deposit(_poolKey, bidWallFee, _beforeSwapTick, nativeToken == Currency.unwrap(_poolKey.currency0));
+                bidWall.deposit(
+                    _poolKey, bidWallFee, _beforeSwapTick, nativeToken == Currency.unwrap(_poolKey.currency0)
+                );
             } else {
                 // If we cannot import into BidWall, then treasury will be allocated the fees
                 treasuryFee += bidWallFee;
@@ -984,12 +1038,23 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @param _poolId The PoolId that is being emitted
      */
-    function _emitSwapUpdate(PoolId _poolId) internal {
+    function _emitSwapUpdate(
+        PoolId _poolId
+    ) internal {
         emit PoolSwap(
             _poolId,
-            _tload(TS_FL_AMOUNT0), _tload(TS_FL_AMOUNT1), _tload(TS_FL_FEE0), _tload(TS_FL_FEE1),
-            _tload(TS_ISP_AMOUNT0), _tload(TS_ISP_AMOUNT1), _tload(TS_ISP_FEE0), _tload(TS_ISP_FEE1),
-            _tload(TS_UNI_AMOUNT0), _tload(TS_UNI_AMOUNT1), _tload(TS_UNI_FEE0), _tload(TS_UNI_FEE1)
+            _tload(TS_FL_AMOUNT0),
+            _tload(TS_FL_AMOUNT1),
+            _tload(TS_FL_FEE0),
+            _tload(TS_FL_FEE1),
+            _tload(TS_ISP_AMOUNT0),
+            _tload(TS_ISP_AMOUNT1),
+            _tload(TS_ISP_FEE0),
+            _tload(TS_ISP_FEE1),
+            _tload(TS_UNI_AMOUNT0),
+            _tload(TS_UNI_AMOUNT1),
+            _tload(TS_UNI_FEE0),
+            _tload(TS_UNI_FEE1)
         );
 
         // @dev We flush the tstore values at this point as although they are only set
@@ -1136,8 +1201,12 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
      *
      * @return value_ The `int` value in the tstore
      */
-    function _tload(bytes32 _key) internal view returns (int value_) {
-        assembly { value_ := tload(_key) }
+    function _tload(
+        bytes32 _key
+    ) internal view returns (int value_) {
+        assembly {
+            value_ := tload(_key)
+        }
     }
 
     /**
@@ -1148,5 +1217,4 @@ contract PositionManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKey
     function _guardInitializeOwner() internal pure override returns (bool) {
         return true;
     }
-
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IL2ToL2CrossDomainMessenger} from "@optimism/L2/interfaces/IL2ToL2CrossDomainMessenger.sol";
+import {IL2ToL2CrossDomainMessenger} from '@optimism/L2/interfaces/IL2ToL2CrossDomainMessenger.sol';
 import {Predeploys} from '@optimism/libraries/Predeploys.sol';
 
 import {Flaunch} from '@flaunch/Flaunch.sol';
@@ -11,9 +11,7 @@ import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
 
 import {FlaunchTest} from './FlaunchTest.sol';
 
-
 contract FlaunchBridgeTest is FlaunchTest {
-
     /// This will be the token ID of the flaunched token
     uint TOKEN_ID = 1;
 
@@ -63,7 +61,7 @@ contract FlaunchBridgeTest is FlaunchTest {
         // Confirm that the brdiging status is initially pending
         assertFalse(
             flaunch.bridgingStatus(TOKEN_ID, ALTERNATIVE_CHAIN_ID),
-            "Bridging status should be false before initialization."
+            'Bridging status should be false before initialization.'
         );
 
         vm.expectEmit();
@@ -74,7 +72,7 @@ contract FlaunchBridgeTest is FlaunchTest {
         // Confirm that the brdiging status has updated
         assertTrue(
             flaunch.bridgingStatus(TOKEN_ID, ALTERNATIVE_CHAIN_ID),
-            "Bridging status should be true after initialization."
+            'Bridging status should be true after initialization.'
         );
     }
 
@@ -91,36 +89,29 @@ contract FlaunchBridgeTest is FlaunchTest {
     }
 
     function test_CanFinalizeBridge_Success() public isValidMessenger isValidSender {
-        Flaunch.MemecoinMetadata memory memecoinMetadata = Flaunch.MemecoinMetadata({
-            name: memecoin.name(),
-            symbol: memecoin.symbol(),
-            tokenUri: memecoin.tokenURI()
-        });
+        Flaunch.MemecoinMetadata memory memecoinMetadata =
+            Flaunch.MemecoinMetadata({name: memecoin.name(), symbol: memecoin.symbol(), tokenUri: memecoin.tokenURI()});
 
         vm.chainId(ALTERNATIVE_CHAIN_ID);
 
         vm.expectEmit();
         emit Flaunch.TokenBridged(TOKEN_ID + 1, ALTERNATIVE_CHAIN_ID, 0x1A727A1caeE6449862aEF80DC3b47E1759ad3967, 123);
 
-        flaunch.finalizeBridge(
-            TOKEN_ID + 1,
-            memecoinMetadata
-        );
+        flaunch.finalizeBridge(TOKEN_ID + 1, memecoinMetadata);
 
         // Additional assertions
         IMemecoin bridgedMemecoin = IMemecoin(0x1A727A1caeE6449862aEF80DC3b47E1759ad3967);
         assertEq(bridgedMemecoin.name(), memecoin.name());
         assertEq(bridgedMemecoin.symbol(), memecoin.symbol());
         assertEq(bridgedMemecoin.tokenURI(), memecoin.tokenURI());
-
     }
 
-    modifier isValidMessenger {
+    modifier isValidMessenger() {
         vm.startPrank(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
         _;
     }
 
-    modifier isValidSender {
+    modifier isValidSender() {
         vm.mockCall(
             Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER,
             abi.encodeWithSelector(IL2ToL2CrossDomainMessenger.crossDomainMessageSender.selector),
@@ -129,5 +120,4 @@ contract FlaunchBridgeTest is FlaunchTest {
 
         _;
     }
-
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IL2ToL2CrossDomainMessenger} from "@optimism/L2/interfaces/IL2ToL2CrossDomainMessenger.sol";
+import {IL2ToL2CrossDomainMessenger} from '@optimism/L2/interfaces/IL2ToL2CrossDomainMessenger.sol';
 import {Predeploys} from '@optimism/libraries/Predeploys.sol';
 
-import {Initializable} from '@solady/utils/Initializable.sol';
+import {Ownable} from '@solady/auth/Ownable.sol';
 import {ERC721} from '@solady/tokens/ERC721.sol';
+import {Initializable} from '@solady/utils/Initializable.sol';
 import {LibClone} from '@solady/utils/LibClone.sol';
 import {LibString} from '@solady/utils/LibString.sol';
-import {Ownable} from '@solady/auth/Ownable.sol';
 
 import {PositionManager} from '@flaunch/PositionManager.sol';
 import {TokenSupply} from '@flaunch/libraries/TokenSupply.sol';
@@ -16,14 +16,12 @@ import {TokenSupply} from '@flaunch/libraries/TokenSupply.sol';
 import {IFlaunch} from '@flaunch-interfaces/IFlaunch.sol';
 import {IMemecoin} from '@flaunch-interfaces/IMemecoin.sol';
 
-
 /**
  * The Flaunch ERC721 NFT that is created when a new position is by the {PositionManager} flaunched.
  * This is used to prove ownership of a pool, so transferring this token would result in a new
  * pool creator being assigned.
  */
 contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
-
     error CallerNotL2ToL2CrossDomainMessenger();
     error InvalidDestinationChain();
     error CallerIsNotPositionManager();
@@ -63,7 +61,8 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
     }
 
     /// The L2 to L2 cross domain messenger predeploy to handle message passing
-    IL2ToL2CrossDomainMessenger internal messenger = IL2ToL2CrossDomainMessenger(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
+    IL2ToL2CrossDomainMessenger internal messenger =
+        IL2ToL2CrossDomainMessenger(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
 
     /// The maximum amount of tokens that can be attributed to the Fair Launch
     uint public constant MAX_FAIR_LAUNCH_TOKENS = 69e27;
@@ -93,13 +92,13 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
     address public memecoinTreasuryImplementation;
 
     /// Maps `TokenInfo` for each token ID
-    mapping (uint _tokenId => TokenInfo _tokenInfo) internal tokenInfo;
+    mapping(uint _tokenId => TokenInfo _tokenInfo) internal tokenInfo;
 
     /// Maps a {Memecoin} ERC20 address to it's token ID
-    mapping (address _memecoin => uint _tokenId) public tokenId;
+    mapping(address _memecoin => uint _tokenId) public tokenId;
 
     /// Maps our ERC20 bridging statuses
-    mapping (uint _tokenId => mapping (uint _chainId => bool _started)) public bridgingStatus;
+    mapping(uint _tokenId => mapping(uint _chainId => bool _started)) public bridgingStatus;
 
     /**
      * References the contract addresses for the Flaunch protocol.
@@ -107,7 +106,7 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      * @param _memecoinImplementation The {Memecoin} implementation address
      * @param _baseURI The default baseUri for the ERC721
      */
-    constructor (address _memecoinImplementation, string memory _baseURI) {
+    constructor(address _memecoinImplementation, string memory _baseURI) {
         memecoinImplementation = _memecoinImplementation;
         baseURI = _baseURI;
 
@@ -122,7 +121,10 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      * @param _positionManager The Flaunch {PositionManager}
      * @param _memecoinTreasuryImplementation The {MemecoinTreasury} implementation address
      */
-    function initialize(PositionManager _positionManager, address _memecoinTreasuryImplementation) external onlyOwner initializer {
+    function initialize(
+        PositionManager _positionManager,
+        address _memecoinTreasuryImplementation
+    ) external onlyOwner initializer {
         positionManager = _positionManager;
         memecoinTreasuryImplementation = _memecoinTreasuryImplementation;
     }
@@ -133,26 +135,37 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      */
     function flaunch(
         PositionManager.FlaunchParams calldata _params
-    ) external override onlyPositionManager returns (
-        address memecoin_,
-        address payable memecoinTreasury_,
-        uint tokenId_
-    ) {
+    )
+        external
+        override
+        onlyPositionManager
+        returns (address memecoin_, address payable memecoinTreasury_, uint tokenId_)
+    {
         // Check if the flaunch timestamp surpasses the max schedule duration
-        if (_params.flaunchAt > block.timestamp + MAX_SCHEDULE_DURATION) revert InvalidFlaunchSchedule();
+        if (_params.flaunchAt > block.timestamp + MAX_SCHEDULE_DURATION) {
+            revert InvalidFlaunchSchedule();
+        }
 
         // Ensure that the initial supply falls within an accepted range
-        if (_params.initialTokenFairLaunch > MAX_FAIR_LAUNCH_TOKENS) revert InvalidInitialSupply(_params.initialTokenFairLaunch);
+        if (_params.initialTokenFairLaunch > MAX_FAIR_LAUNCH_TOKENS) {
+            revert InvalidInitialSupply(_params.initialTokenFairLaunch);
+        }
 
         // Check that user isn't trying to premine too many tokens
-        if (_params.premineAmount > _params.initialTokenFairLaunch) revert PremineExceedsInitialAmount(_params.premineAmount, _params.initialTokenFairLaunch);
+        if (_params.premineAmount > _params.initialTokenFairLaunch) {
+            revert PremineExceedsInitialAmount(_params.premineAmount, _params.initialTokenFairLaunch);
+        }
 
         // A creator cannot set their allocation above a threshold
-        if (_params.creatorFeeAllocation > MAX_CREATOR_ALLOCATION) revert CreatorFeeAllocationInvalid(_params.creatorFeeAllocation, MAX_CREATOR_ALLOCATION);
+        if (_params.creatorFeeAllocation > MAX_CREATOR_ALLOCATION) {
+            revert CreatorFeeAllocationInvalid(_params.creatorFeeAllocation, MAX_CREATOR_ALLOCATION);
+        }
 
         // Store the current token ID and increment the next token ID
         tokenId_ = nextTokenId;
-        unchecked { nextTokenId++; }
+        unchecked {
+            nextTokenId++;
+        }
 
         // Mint ownership token to the creator
         _mint(_params.creator, tokenId_);
@@ -168,9 +181,7 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
         _memecoin.initialize(_params.name, _params.symbol, _params.tokenUri);
 
         // Deploy the memecoin treasury
-        memecoinTreasury_ = payable(
-            LibClone.cloneDeterministic(memecoinTreasuryImplementation, bytes32(tokenId_))
-        );
+        memecoinTreasury_ = payable(LibClone.cloneDeterministic(memecoinTreasuryImplementation, bytes32(tokenId_)));
 
         // Store the token info
         tokenInfo[tokenId_] = TokenInfo(memecoin_, memecoinTreasury_);
@@ -198,10 +209,12 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
 
     /**
      * Allows a contract owner to update the base URI for the creator ERC721 tokens.
-     * 
+     *
      * @param _baseURI The new base URI
      */
-    function setBaseURI(string memory _baseURI) external onlyOwner {
+    function setBaseURI(
+        string memory _baseURI
+    ) external onlyOwner {
         baseURI = _baseURI;
     }
 
@@ -227,9 +240,13 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      *
      * @param _tokenId The token ID to get the URI for
      */
-    function tokenURI(uint _tokenId) public view override returns (string memory) {
+    function tokenURI(
+        uint _tokenId
+    ) public view override returns (string memory) {
         // If we are ahead of our tracked tokenIds, then revert
-        if (_tokenId == 0 || _tokenId >= nextTokenId) revert TokenDoesNotExist();
+        if (_tokenId == 0 || _tokenId >= nextTokenId) {
+            revert TokenDoesNotExist();
+        }
 
         // If the base URI is empty, return the memecoin token URI
         if (bytes(baseURI).length == 0) {
@@ -247,7 +264,9 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      *
      * @return address {Memecoin} address
      */
-    function memecoin(uint _tokenId) public view returns (address) {
+    function memecoin(
+        uint _tokenId
+    ) public view returns (address) {
         return tokenInfo[_tokenId].memecoin;
     }
 
@@ -258,7 +277,9 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      *
      * @return address {MemecoinTreasury} address
      */
-    function memecoinTreasury(uint _tokenId) public view returns (address payable) {
+    function memecoinTreasury(
+        uint _tokenId
+    ) public view returns (address payable) {
         return tokenInfo[_tokenId].memecoinTreasury;
     }
 
@@ -269,7 +290,9 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      *
      * @param _tokenId The token ID to check
      */
-    function burn(uint _tokenId) public {
+    function burn(
+        uint _tokenId
+    ) public {
         _burn(msg.sender, _tokenId);
     }
 
@@ -288,7 +311,9 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      * @param _chainId The destination L2 chainId
      */
     function initializeBridge(uint _tokenId, uint _chainId) public {
-        if (_chainId == block.chainid) revert InvalidDestinationChain();
+        if (_chainId == block.chainid) {
+            revert InvalidDestinationChain();
+        }
 
         // Ensure we have not already bridged
         if (bridgingStatus[_tokenId][_chainId]) {
@@ -359,8 +384,12 @@ contract Flaunch is ERC721, IFlaunch, Initializable, Ownable {
      * Modifier to restrict a function to only be a cross-domain callback into this contract.
      */
     modifier onlyCrossDomainCallback() {
-        if (msg.sender != address(messenger)) revert CallerNotL2ToL2CrossDomainMessenger();
-        if (messenger.crossDomainMessageSender() != address(this)) revert InvalidCrossDomainSender();
+        if (msg.sender != address(messenger)) {
+            revert CallerNotL2ToL2CrossDomainMessenger();
+        }
+        if (messenger.crossDomainMessageSender() != address(this)) {
+            revert InvalidCrossDomainSender();
+        }
 
         _;
     }

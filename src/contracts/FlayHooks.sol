@@ -3,16 +3,20 @@ pragma solidity ^0.8.26;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
-import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
 import {BaseHook} from '@uniswap-periphery/base/hooks/BaseHook.sol';
-import {BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
+
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
 import {Hooks, IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
-import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+
 import {SafeCast} from '@uniswap/v4-core/src/libraries/SafeCast.sol';
 import {StateLibrary} from '@uniswap/v4-core/src/libraries/StateLibrary.sol';
+import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
+import {
+    BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta
+} from '@uniswap/v4-core/src/types/BeforeSwapDelta.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
+import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
 
 import {BidWall} from '@flaunch/bidwall/BidWall.sol';
 
@@ -23,7 +27,6 @@ import {InternalSwapPool} from '@flaunch/hooks/InternalSwapPool.sol';
  * FLETH/FLAY pool.
  */
 contract FlayHooks is BaseHook, InternalSwapPool {
-    
     using PoolIdLibrary for PoolKey;
     using BeforeSwapDeltaLibrary for BeforeSwapDelta;
     using SafeCast for uint;
@@ -46,7 +49,7 @@ contract FlayHooks is BaseHook, InternalSwapPool {
 
     /// The minimum amount before a distribution is triggered
     uint public constant MIN_DISTRIBUTE_THRESHOLD = 0.001 ether;
-    
+
     /// Store the contract that will manage our Bidwall interactions
     BidWall public immutable bidWall;
 
@@ -90,23 +93,22 @@ contract FlayHooks is BaseHook, InternalSwapPool {
      * @dev 1000 0011 0011 00 == 20CC
      */
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
-        return
-            Hooks.Permissions({
-                beforeInitialize: true, // Prevent initialize
-                afterInitialize: false,
-                beforeAddLiquidity: false,
-                afterAddLiquidity: false,
-                beforeRemoveLiquidity: false,
-                afterRemoveLiquidity: false,
-                beforeSwap: true, // [InternalSwapPool]
-                afterSwap: true, // [InternalSwapPool], [BidWall]
-                beforeDonate: false,
-                afterDonate: false,
-                beforeSwapReturnDelta: true, // [InternalSwapPool]
-                afterSwapReturnDelta: true, // [FeeDistributor]
-                afterAddLiquidityReturnDelta: false,
-                afterRemoveLiquidityReturnDelta: false
-            });
+        return Hooks.Permissions({
+            beforeInitialize: true, // Prevent initialize
+            afterInitialize: false,
+            beforeAddLiquidity: false,
+            afterAddLiquidity: false,
+            beforeRemoveLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: true, // [InternalSwapPool]
+            afterSwap: true, // [InternalSwapPool], [BidWall]
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: true, // [InternalSwapPool]
+            afterSwapReturnDelta: true, // [FeeDistributor]
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
     }
 
     /**
@@ -115,7 +117,11 @@ contract FlayHooks is BaseHook, InternalSwapPool {
      * @dev As we call `poolManager.initialize` from the IHooks contract itself, we bypass this
      * hook call as therefore bypass the prevention.
      */
-    function beforeInitialize(address, PoolKey calldata, uint160) external view override onlyPoolManager returns (bytes4) {
+    function beforeInitialize(
+        address,
+        PoolKey calldata,
+        uint160
+    ) external view override onlyPoolManager returns (bytes4) {
         revert CannotBeInitializedDirectly();
     }
 
@@ -132,19 +138,16 @@ contract FlayHooks is BaseHook, InternalSwapPool {
      * @param _params The parameters for the swap
      *
      * @return selector_ The function selector for the hook
-     * @return beforeSwapDelta_ The hook's delta in specified and unspecified currencies. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     * @return beforeSwapDelta_ The hook's delta in specified and unspecified currencies. Positive: the hook is
+     * owed/took currency, negative: the hook owes/sent currency
      * @return swapFee_ The percentage fee applied to our swap
      */
     function beforeSwap(
-        address /* _sender */,
+        address, /* _sender */
         PoolKey calldata _key,
         IPoolManager.SwapParams memory _params,
         bytes calldata /* _hookData */
-    ) public override onlyPoolManager returns (
-        bytes4 selector_,
-        BeforeSwapDelta beforeSwapDelta_,
-        uint24
-    ) {
+    ) public override onlyPoolManager returns (bytes4 selector_, BeforeSwapDelta beforeSwapDelta_, uint24) {
         // Check the {InternalSwapPool} for any tokens that can be swapped before hitting Uniswap
         (uint tokenIn, uint tokenOut) = _internalSwap(poolManager, _key, _params, true);
         if (tokenIn + tokenOut != 0) {
@@ -161,7 +164,8 @@ contract FlayHooks is BaseHook, InternalSwapPool {
             // Increase the delta being sent back
             beforeSwapDelta_ = toBeforeSwapDelta(
                 beforeSwapDelta_.getSpecifiedDelta() + internalBeforeSwapDelta.getSpecifiedDelta(),
-                beforeSwapDelta_.getUnspecifiedDelta() + internalBeforeSwapDelta.getUnspecifiedDelta() + _swapFee.toInt128()
+                beforeSwapDelta_.getUnspecifiedDelta() + internalBeforeSwapDelta.getUnspecifiedDelta()
+                    + _swapFee.toInt128()
             );
         }
 
@@ -181,7 +185,8 @@ contract FlayHooks is BaseHook, InternalSwapPool {
      * @param _delta The amount owed to the caller (positive) or owed to the pool (negative)
      *
      * @return selector_ The function selector for the hook
-     * @return hookDeltaUnspecified_ The hook's delta in unspecified currency. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     * @return hookDeltaUnspecified_ The hook's delta in unspecified currency. Positive: the hook is owed/took currency,
+     * negative: the hook owes/sent currency
      */
     function afterSwap(
         address,
@@ -189,10 +194,7 @@ contract FlayHooks is BaseHook, InternalSwapPool {
         IPoolManager.SwapParams calldata _params,
         BalanceDelta _delta,
         bytes calldata
-    ) public override onlyPoolManager returns (
-        bytes4 selector_,
-        int128 hookDeltaUnspecified_
-    ) {
+    ) public override onlyPoolManager returns (bytes4 selector_, int128 hookDeltaUnspecified_) {
         // We need to determine the amount of fees generated by our Uniswap swap to capture, rather
         // than sending the full amount to the end user.
         int128 swapAmount = _params.amountSpecified < 0 == _params.zeroForOne ? _delta.amount1() : _delta.amount0();
@@ -254,7 +256,9 @@ contract FlayHooks is BaseHook, InternalSwapPool {
      *
      * @param _poolKey The PoolKey reference that will have fees distributed
      */
-    function _distributeFees(PoolKey memory _poolKey) internal {
+    function _distributeFees(
+        PoolKey memory _poolKey
+    ) internal {
         PoolId poolId = _poolKey.toId();
 
         // Get the amount of the native token available to distribute
@@ -273,5 +277,4 @@ contract FlayHooks is BaseHook, InternalSwapPool {
 
         emit PoolFeesDistributed(poolId, bidWallFee, 0, bidWallFee, 0, 0);
     }
-
 }

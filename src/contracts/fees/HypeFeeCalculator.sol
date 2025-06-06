@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
 import {FixedPointMathLib} from '@solady/utils/FixedPointMathLib.sol';
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
+import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
+
 import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
+import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
 
-import {FairLaunch} from '@flaunch/hooks/FairLaunch.sol';
 import {IFeeCalculator} from '@flaunch-interfaces/IFeeCalculator.sol';
-
+import {FairLaunch} from '@flaunch/hooks/FairLaunch.sol';
 
 /**
  * Calculates hype fees during fair launch based on token sale rates.
  * The fee increases as the sale rate exceeds the target rate to discourage sniping.
  */
 contract HypeFeeCalculator is IFeeCalculator {
-
     using PoolIdLibrary for PoolKey;
     using FixedPointMathLib for uint;
 
@@ -65,7 +64,7 @@ contract HypeFeeCalculator is IFeeCalculator {
      * @param _fairLaunch The address of our {FairLaunch} contract
      * @param _nativeToken The native token used for Flaunch
      */
-    constructor (FairLaunch _fairLaunch, address _nativeToken) {
+    constructor(FairLaunch _fairLaunch, address _nativeToken) {
         fairLaunch = _fairLaunch;
         nativeToken = _nativeToken;
 
@@ -85,8 +84,12 @@ contract HypeFeeCalculator is IFeeCalculator {
 
         // Ensure that this call is coming from the {PositionManager} and validate the
         // value passed.
-        if (msg.sender != positionManager) revert CallerNotPositionManager();
-        if (_targetTokensPerSec == 0) revert ZeroTargetTokensPerSec();
+        if (msg.sender != positionManager) {
+            revert CallerNotPositionManager();
+        }
+        if (_targetTokensPerSec == 0) {
+            revert ZeroTargetTokensPerSec();
+        }
 
         poolInfos[_poolId].targetTokensPerSec = _targetTokensPerSec;
     }
@@ -117,7 +120,9 @@ contract HypeFeeCalculator is IFeeCalculator {
         uint elapsedSeconds = block.timestamp - (flInfo.endsAt - FAIR_LAUNCH_WINDOW);
 
         // Prevent division by zero
-        if (elapsedSeconds == 0) return _baseFee;
+        if (elapsedSeconds == 0) {
+            return _baseFee;
+        }
 
         // Calculate current sale rate
         uint currentSaleRatePerSec = poolInfo.totalTokensSold / elapsedSeconds;
@@ -131,18 +136,15 @@ contract HypeFeeCalculator is IFeeCalculator {
         } else {
             // Calculate hype fee
             uint rateExcess = currentSaleRatePerSec - targetTokensPerSec;
-            uint hypeFeeScaled = MINIMUM_FEE_SCALED +
-                ((MAXIMUM_FEE_SCALED - MINIMUM_FEE_SCALED) * rateExcess) /
-                targetTokensPerSec;
+            uint hypeFeeScaled =
+                MINIMUM_FEE_SCALED + ((MAXIMUM_FEE_SCALED - MINIMUM_FEE_SCALED) * rateExcess) / targetTokensPerSec;
 
             // Cap at MAX_FEE
             swapFeeScaled = FixedPointMathLib.min(hypeFeeScaled, MAXIMUM_FEE_SCALED);
         }
 
         // Ensure that the swap fee is at least the base fee. scale down the result to bps
-        swapFee_ = uint24(
-            FixedPointMathLib.max(swapFeeScaled, _baseFee * 1_00) / 1_00
-        );
+        swapFee_ = uint24(FixedPointMathLib.max(swapFeeScaled, _baseFee * 1_00) / 1_00);
     }
 
     /**
@@ -152,14 +154,16 @@ contract HypeFeeCalculator is IFeeCalculator {
      * @param _delta The amount owed to the caller (positive) or owed to the pool (negative)
      */
     function trackSwap(
-        address /* _sender */,
+        address, /* _sender */
         PoolKey calldata _key,
-        IPoolManager.SwapParams calldata /* _params */,
+        IPoolManager.SwapParams calldata, /* _params */
         BalanceDelta _delta,
         bytes calldata /* _hookData */
     ) external override {
         // Ensure that this call is coming from the {PositionManager}
-        if (msg.sender != positionManager) revert CallerNotPositionManager();
+        if (msg.sender != positionManager) {
+            revert CallerNotPositionManager();
+        }
 
         // Load our PoolInfo, opened as storage to update values
         PoolId poolId = _key.toId();
@@ -171,11 +175,7 @@ contract HypeFeeCalculator is IFeeCalculator {
         }
 
         // Absolute amount of non-native token swapped
-        int tokenDelta = int(
-            Currency.unwrap(_key.currency0) == nativeToken
-                ? _delta.amount1()
-                : _delta.amount0()
-        );
+        int tokenDelta = int(Currency.unwrap(_key.currency0) == nativeToken ? _delta.amount1() : _delta.amount0());
 
         // Update the total tokens sold
         poolInfo.totalTokensSold += uint(tokenDelta < 0 ? -tokenDelta : tokenDelta);
@@ -191,7 +191,9 @@ contract HypeFeeCalculator is IFeeCalculator {
      *
      * @return The target tokens per second
      */
-    function getTargetTokensPerSec(PoolId _poolId) public view returns (uint) {
+    function getTargetTokensPerSec(
+        PoolId _poolId
+    ) public view returns (uint) {
         uint storedTargetTokensPerSec = poolInfos[_poolId].targetTokensPerSec;
 
         //

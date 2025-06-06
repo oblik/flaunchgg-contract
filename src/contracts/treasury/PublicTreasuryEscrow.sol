@@ -6,13 +6,11 @@ import {Initializable} from '@solady/utils/Initializable.sol';
 import {Flaunch} from '@flaunch/Flaunch.sol';
 import {MemecoinTreasury} from '@flaunch/treasury/MemecoinTreasury.sol';
 
-
 /**
  * Allows a {Flaunch} ERC721 token holder to deposit their ERC721 into this escrow contract to
  * allow anyone to execute approve treasury actions.
  */
 contract PublicTreasuryEscrow is Initializable {
-
     error NotOriginalOwner();
     error OwnershipBurned();
 
@@ -37,7 +35,9 @@ contract PublicTreasuryEscrow is Initializable {
      *
      * @param _flaunch The {Flaunch} ERC721 contract address
      */
-    constructor (address _flaunch) {
+    constructor(
+        address _flaunch
+    ) {
         flaunch = Flaunch(_flaunch);
     }
 
@@ -47,7 +47,9 @@ contract PublicTreasuryEscrow is Initializable {
      *
      * @param _tokenId The ID of the token to escrow
      */
-    function initialize(uint _tokenId) public initializer {
+    function initialize(
+        uint _tokenId
+    ) public initializer {
         // Register the immutable tokenId
         tokenId = _tokenId;
 
@@ -94,8 +96,7 @@ contract PublicTreasuryEscrow is Initializable {
      */
     function claim() public {
         flaunch.positionManager().withdrawFees(
-            ownershipBurned ? flaunch.memecoinTreasury(tokenId) : originalOwner,
-            true
+            ownershipBurned ? flaunch.memecoinTreasury(tokenId) : originalOwner, true
         );
     }
 
@@ -113,10 +114,13 @@ contract PublicTreasuryEscrow is Initializable {
      * Checks that the token ownership has not been burned and that the original owner of
      * the token is the function caller.
      */
-    modifier ownerAndUnburned {
-        if (ownershipBurned) revert OwnershipBurned();
-        if (originalOwner != msg.sender) revert NotOriginalOwner();
+    modifier ownerAndUnburned() {
+        if (ownershipBurned) {
+            revert OwnershipBurned();
+        }
+        if (originalOwner != msg.sender) {
+            revert NotOriginalOwner();
+        }
         _;
     }
-
 }

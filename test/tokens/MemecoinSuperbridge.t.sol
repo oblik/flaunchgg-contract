@@ -2,21 +2,20 @@
 pragma solidity ^0.8.0;
 
 // Testing utilities
-import { FlaunchTest } from '../FlaunchTest.sol';
+import {FlaunchTest} from '../FlaunchTest.sol';
 
 // Flaunch contracts
-import { Memecoin } from '@flaunch/Memecoin.sol';
-import { PositionManager } from '@flaunch/PositionManager.sol';
+import {Memecoin} from '@flaunch/Memecoin.sol';
+import {PositionManager} from '@flaunch/PositionManager.sol';
 
 // Libraries
-import { Predeploys } from '@optimism/libraries/Predeploys.sol';
+import {Predeploys} from '@optimism/libraries/Predeploys.sol';
 
 // Target contracts
-import { IERC7802, IERC165 } from '@optimism/L2/interfaces/IERC7802.sol';
-import { ISuperchainERC20 } from '@optimism/L2/interfaces/ISuperchainERC20.sol';
+import {IERC165, IERC7802} from '@optimism/L2/interfaces/IERC7802.sol';
+import {ISuperchainERC20} from '@optimism/L2/interfaces/ISuperchainERC20.sol';
 
-import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
  * @title SuperchainERC20Test
@@ -26,7 +25,6 @@ import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
  * @dev Copied from lib/@optimism and modified to support Memecoin.
  */
 contract MemecoinSuperchainERC20Test is FlaunchTest {
-
     address internal constant ZERO_ADDRESS = address(0);
     address internal constant SUPERCHAIN_TOKEN_BRIDGE = Predeploys.SUPERCHAIN_TOKEN_BRIDGE;
     address internal constant MESSENGER = Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER;
@@ -152,5 +150,4 @@ contract MemecoinSuperchainERC20Test is FlaunchTest {
         assertTrue(superchainERC20.supportsInterface(type(IERC7802).interfaceId));
         assertTrue(superchainERC20.supportsInterface(type(IERC20).interfaceId));
     }
-
 }

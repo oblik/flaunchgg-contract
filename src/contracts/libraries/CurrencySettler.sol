@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
-import {IERC20Minimal} from '@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol';
 import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
-
+import {IERC20Minimal} from '@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol';
+import {Currency} from '@uniswap/v4-core/src/types/Currency.sol';
 
 /**
  * Library used to interact with PoolManager.sol to settle any open deltas:
@@ -14,7 +13,6 @@ import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
  * @dev Note that sync() is called before any erc-20 transfer in `settle`.
  */
 library CurrencySettler {
-
     /**
      * Settle (pay) a currency to the PoolManager.
      *
@@ -54,5 +52,4 @@ library CurrencySettler {
     function take(Currency currency, IPoolManager manager, address recipient, uint amount, bool claims) internal {
         claims ? manager.mint(recipient, currency.toId(), amount) : manager.take(currency, recipient, amount);
     }
-
 }
